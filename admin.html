@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><title>إدارة صيدلية المنورة</title><style>
+:root{--blue:#202779;--bg:#f3f5fa;--ink:#17182b}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Tahoma,Arial,sans-serif;color:var(--ink)}header{background:var(--blue);color:white;padding:18px;text-align:center}main{max-width:650px;margin:18px auto;padding:12px}.admin{background:white;border-radius:20px;padding:18px;margin:12px 0}.admin h2{color:var(--blue)}input{width:100%;padding:13px;border:1px solid #bbb;border-radius:10px;margin:8px 0;font-size:16px}button{cursor:pointer;border:0;font-family:inherit;background:var(--blue);color:white;border-radius:15px;padding:13px 20px;font-size:16px;margin:6px 0}button.secondary{background:#e9ebf5;color:var(--blue)}.hide{display:none!important}.field{margin:12px 0}label{display:block}
+</style></head><body><header><h1>لوحة تحكم صيدلية المنورة</h1></header><main>
+<section class="admin" id="loginPanel"><h2>تسجيل دخول المدير</h2><label>اسم المستخدم</label><input id="loginUsername" placeholder="اسم المستخدم"><label>كلمة المرور</label><input id="loginPassword" type="password" placeholder="كلمة المرور"><button id="loginBtn">دخول</button><p id="loginError" style="display:none;color:#b00020"></p></section>
+<section id="adminContent" class="hide"><section id="adminPanel"><header><h2 class="page-title">لوحة التحكم</h2><span onclick="go('home')">✕</span></header><div class="admin"><h2>إدارة المحتوى</h2><h3>إدارة أقسام الأدوية</h3>
+<input id="newCategory" placeholder="اسم القسم الجديد (مثلاً: الفيتامينات)">
+<button class="primary" id="addCategoryBtn">إضافة القسم</button>
+<div id="categoriesAdminList"></div>
+<hr><h3>إضافة منتج</h3><input id="newProduct" placeholder="اسم المنتج"><input id="newPrice" placeholder="السعر بالريال"><input id="newProductImage" placeholder="رابط صورة المنتج (اختياري)"><select id="productCategory" style="width:100%;padding:13px;border-radius:10px;margin:8px 0;font-size:16px"><option value="الأدوية">الأدوية</option></select><button class="primary" id="addProductBtn">إضافة المنتج</button>
+<h3>المنتجات الموجودة (مع الحذف)</h3><div id="productsAdminList"></div><hr><h3>إضافة صيدلية</h3><input id="newPharmacy" placeholder="اسم الصيدلية"><input id="newArea" placeholder="المنطقة"><button class="primary" onclick="addPharmacy()">إضافة الصيدلية</button><hr><h3>إضافة كتاب</h3><input id="newBook" placeholder="اسم الكتاب"><button class="primary" onclick="addBook()">إضافة الكتاب</button><div id="adminItems"></div></div><div class="admin" id="settingsSection">
+  <h2>إعدادات حساب المدير</h2>
+  <div class="field">
+    <label>اسم المستخدم الجديد:</label>
+    <input type="text" id="newAdminUsername" placeholder="أدخل اسم المستخدم (مثلاً: admin)">
+  </div>
+  <div class="field">
+    <label>كلمة المرور الجديدة:</label>
+    <input type="password" id="newAdminPassword" placeholder="أدخل كلمة المرور الجديدة (6 أحرف على الأقل)">
+  </div>
+  <button class="primary" id="updateCredentialsBtn">حفظ التغييرات</button>
+</div></section><button class="secondary" id="adminLogout">تسجيل الخروج</button></section></main>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, updateEmail,
+  updatePassword, onAuthStateChanged, setPersistence, inMemoryPersistence
+} from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCcqXYGTvlZ2RY6_RpFEwNFQJExiqCGeQw",
+  authDomain: "al-manawara-pharmacy.firebaseapp.com",
+  projectId: "al-manawara-pharmacy",
+  storageBucket: "al-manawara-pharmacy.firebasestorage.app",
+  messagingSenderId: "278918061465",
+  appId: "1:278918061465:web:6434e8792a5cd5ef9a8708",
+  measurementId: "G-8HB9XPSWZP"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+window.firebaseApp = app;
+window.firebaseDb = db;
+
+const loginPanel = document.getElementById("loginPanel");
+const adminContent = document.getElementById("adminContent");
+const loginBtn = document.getElementById("loginBtn");
+const loginUsername = document.getElementById("loginUsername");
+const loginPassword = document.getElementById("loginPassword");
+const loginError = document.getElementById("loginError");
+
+function showAdmin(user) {
+  const loggedIn = Boolean(user);
+  loginPanel.classList.toggle("hide", loggedIn);
+  adminContent.classList.toggle("hide", !loggedIn);
+  if (loggedIn) {
+    loginError.style.display = "none";
+    // Display admin panel once the authenticated state is confirmed.
+    document.getElementById("adminPanel").classList.remove("hide");
+  }
+}
+
+try {
+  await setPersistence(auth, inMemoryPersistence);
+} catch (e) {
+  console.warn("تعذر إعداد جلسة الدخول المؤقتة:", e);
+}
+
+onAuthStateChanged(auth, user => showAdmin(user), error => {
+  loginError.textContent = "تعذر التحقق من جلسة الدخول: " + (error.code || error.message);
+  loginError.style.display = "block";
+});
+
+loginBtn.addEventListener("click", async () => {
+  const username = loginUsername.value.trim();
+  const password = loginPassword.value;
+
+  if (!username || !password) {
+    loginError.textContent = "الرجاء إدخال اسم المستخدم وكلمة المرور!";
+    loginError.style.display = "block";
+    return;
+  }
+
+  const email = username.includes("@") ? username : username + "@almanwara.com";
+  loginError.style.display = "none";
+  loginBtn.disabled = true;
+  loginBtn.textContent = "جارٍ تسجيل الدخول...";
+
+  try {
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    loginUsername.value = "";
+    loginPassword.value = "";
+    showAdmin(credential.user);
+  } catch (error) {
+    console.error("Firebase sign-in error:", error);
+    const code = error.code || "unknown";
+    let message = "تعذر تسجيل الدخول. ";
+    if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+      message += "تأكد من اسم المستخدم وكلمة المرور.";
+    } else if (code === "auth/unauthorized-domain") {
+      message += "اسم نطاق الموقع غير مسموح في Firebase Authentication.";
+    } else if (code === "auth/too-many-requests") {
+      message += "محاولات كثيرة؛ انتظر قليلًا ثم أعد المحاولة.";
+    } else if (code === "auth/network-request-failed") {
+      message += "تحقق من اتصال الإنترنت.";
+    } else {
+      message += code + " — " + (error.message || "");
+    }
+    loginError.textContent = message;
+    loginError.style.display = "block";
+  } finally {
+    loginBtn.disabled = false;
+    loginBtn.textContent = "دخول";
+  }
+});
+
+document.getElementById("adminLogout").addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    showAdmin(null);
+  } catch (error) {
+    alert("تعذر تسجيل الخروج: " + (error.code || error.message));
+  }
+});
+
+document.getElementById("updateCredentialsBtn").addEventListener("click", async () => {
+  const user = auth.currentUser;
+  const newUsername = document.getElementById("newAdminUsername").value.trim();
+  const newPassword = document.getElementById("newAdminPassword").value;
+
+  if (!user) {
+    alert("يجب تسجيل الدخول أولًا لتغيير البيانات.");
+    return;
+  }
+  if (newPassword && newPassword.length < 6) {
+    alert("كلمة المرور يجب أن تكون 6 أحرف على الأقل.");
+    return;
+  }
+
+  try {
+    if (newUsername) await updateEmail(user, newUsername + "@almanwara.com");
+    if (newPassword) await updatePassword(user, newPassword);
+    alert("تم تحديث بيانات الدخول بنجاح.");
+    document.getElementById("newAdminUsername").value = "";
+    document.getElementById("newAdminPassword").value = "";
+  } catch (error) {
+    alert("فشل التحديث: " + (error.code || error.message));
+  }
+});
+
+// إدارة الأقسام والمنتجات عبر Firestore (سحابي، دون تخزين محلي على الهاتف)
+const categoriesCol=collection(db,"pharmacyCategories");
+const productsCol=collection(db,"pharmacyProducts");
+let categoriesCache=[],productsCache=[];
+function safeText(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function renderAdminLists(){
+ const select=document.getElementById("productCategory");
+ const old=select.value;
+ select.innerHTML=(categoriesCache.length?categoriesCache:[{name:"الأدوية"}]).map(c=>`<option value="${safeText(c.name)}">${safeText(c.name)}</option>`).join("");
+ if([...select.options].some(o=>o.value===old))select.value=old;
+ document.getElementById("categoriesAdminList").innerHTML=categoriesCache.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;background:#f3f5fa;padding:10px;border-radius:10px;margin:6px 0"><span>${safeText(c.name)}</span><button style="background:#b00020" data-del-cat="${c.id}">حذف القسم</button></div>`).join("")||"<p>لا توجد أقسام مضافة بعد.</p>";
+ document.getElementById("productsAdminList").innerHTML=productsCache.map(p=>`<div style="display:flex;gap:10px;justify-content:space-between;align-items:center;background:#f3f5fa;padding:10px;border-radius:10px;margin:6px 0"><span>${safeText(p.name)} — ${safeText(p.category||"الأدوية")} — ${safeText(p.price)}</span><button style="background:#b00020" data-del-prod="${p.id}">حذف المنتج</button></div>`).join("")||"<p>لا توجد منتجات محفوظة.</p>";
+ document.querySelectorAll("[data-del-cat]").forEach(b=>b.onclick=async()=>{const id=b.dataset.delCat;const cat=categoriesCache.find(c=>c.id===id);if(!cat)return;if(productsCache.some(p=>p.category===cat.name)){alert("لا يمكن حذف القسم قبل حذف المنتجات التابعة له.");return;}if(confirm(`هل تريد حذف القسم «${cat.name}»؟`))try{await deleteDoc(doc(db,"pharmacyCategories",id));}catch(e){alert("تعذر حذف القسم: "+e.message);}});
+ document.querySelectorAll("[data-del-prod]").forEach(b=>b.onclick=async()=>{const id=b.dataset.delProd;const prod=productsCache.find(p=>p.id===id);if(prod&&confirm(`هل تريد حذف المنتج «${prod.name}»؟`))try{await deleteDoc(doc(db,"pharmacyProducts",id));}catch(e){alert("تعذر حذف المنتج: "+e.message);}});
+}
+onSnapshot(categoriesCol,s=>{categoriesCache=s.docs.map(d=>({id:d.id,...d.data()}));renderAdminLists();},e=>alert("خطأ تحميل الأقسام: "+e.message));
+onSnapshot(productsCol,s=>{productsCache=s.docs.map(d=>({id:d.id,...d.data()}));renderAdminLists();},e=>alert("خطأ تحميل المنتجات: "+e.message));
+document.getElementById("addCategoryBtn").onclick=async()=>{const name=document.getElementById("newCategory").value.trim();if(!name){alert("اكتب اسم القسم");return;}if(categoriesCache.some(c=>c.name===name)){alert("هذا القسم موجود بالفعل");return;}try{await addDoc(categoriesCol,{name,createdAt:serverTimestamp()});document.getElementById("newCategory").value="";alert("تم إضافة القسم");}catch(e){alert("تعذر إضافة القسم: "+e.message);}};
+window.addProduct=async()=>{const name=document.getElementById("newProduct").value.trim(),price=document.getElementById("newPrice").value.trim(),category=document.getElementById("productCategory").value,image=document.getElementById("newProductImage").value.trim();if(!name||!price){alert("أدخل اسم المنتج والسعر");return;}try{await addDoc(productsCol,{name,price:price+" ريال",category,img:image||"https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80",createdAt:serverTimestamp()});document.getElementById("newProduct").value="";document.getElementById("newPrice").value="";document.getElementById("newProductImage").value="";alert("تم إضافة المنتج إلى Firebase");}catch(e){alert("تعذر إضافة المنتج: "+e.message);}};
+// Keep existing ancillary controls for pharmacy and book sections.
+
+window.addPharmacy = () => alert("إضافة الصيدلية تحتاج ربط مجموعة الصيدليات في Firestore.");
+window.addBook = () => alert("إضافة الكتاب تحتاج ربط مجموعة الكتب في Firestore.");
+</script></body></html>
