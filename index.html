@@ -117,11 +117,11 @@ window.applyFirebaseCategories = function(items){
  const fallback=PHARMACY_FALLBACK_IMAGE;
  // Normalize records and recognize empty/null parent IDs as main categories.
  const normalized=(Array.isArray(items)?items:[]).map(c=>({...c,
-   name:String(c.name??c.categoryName??c.title??'').trim(),
-   img:String(c.img??c.image??c.imageUrl??c.photo??'').trim(),
-   parentId:(c.parentId===undefined||c.parentId===null||c.parentId===''||String(c.parentId).toLowerCase()==='null')?null:c.parentId
+   name:String(c.name??c.categoryName??c.title??c.label??'').trim(),
+   img:String(c.img??c.image??c.imageUrl??c.photo??c.picture??'').trim(),
+   parentId:(c.parentId===undefined||c.parentId===null||c.parentId===''||String(c.parentId).toLowerCase()==='null'||String(c.parentId).toLowerCase()==='undefined')?null:String(c.parentId)
  })).filter(c=>c.id&&c.name);
- const roots=normalized.filter(c=>c.parentId===null);
+ const roots=normalized.filter(c=>c.parentId===null||!normalized.some(parent=>parent.id===c.parentId));
  window.pharmacyCategoriesData=normalized;
  const tile=(c,cls='cat')=>`<div class="${cls}" data-category-id="${safeHtmlText(c.id)}" data-category-name="${safeHtmlText(c.name)}"><img src="${safeHtmlText(c.img||fallback)}" alt="${safeHtmlText(c.name)}" onerror="fixImage(this)"><span>${safeHtmlText(c.name)}</span></div>`;
  if(wrap){wrap.classList.add("category-scroll-list");wrap.innerHTML=roots.map(c=>tile(c,'cat')).join('');}
